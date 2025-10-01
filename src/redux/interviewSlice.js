@@ -6,6 +6,8 @@ const initialState = {
   candidateEmail: '',
   candidatePhone: '',
   resumeUploaded: false,
+  resumeText: '', // Store full resume text for context
+  jobRole: 'Full-Stack Developer', // Job role for interview
   
   // Interview state
   isInterviewActive: false,
@@ -32,13 +34,17 @@ const interviewSlice = createSlice({
   initialState,
   reducers: {
     setCandidateInfo: (state, action) => {
-      const { name, email, phone } = action.payload;
+      const { name, email, phone, fullText } = action.payload;
       state.candidateName = name || state.candidateName;
       state.candidateEmail = email || state.candidateEmail;
       state.candidatePhone = phone || state.candidatePhone;
+      if (fullText) state.resumeText = fullText;
     },
     setResumeUploaded: (state, action) => {
       state.resumeUploaded = action.payload;
+    },
+    setJobRole: (state, action) => {
+      state.jobRole = action.payload;
     },
     startInterview: (state, action) => {
       state.isInterviewActive = true;
@@ -85,6 +91,7 @@ const interviewSlice = createSlice({
 export const {
   setCandidateInfo,
   setResumeUploaded,
+  setJobRole,
   startInterview,
   setTimeRemaining,
   submitAnswer,

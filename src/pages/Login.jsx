@@ -1,18 +1,21 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { useDispatch } from 'react-redux';
-import { Form, Input, Button, Card, message } from 'antd';
+import { Form, Input, Button, Card, message, Alert } from 'antd';
 import { signInWithEmailAndPassword } from 'firebase/auth';
 import { auth } from '../firebase/config';
 import { setUser } from '../redux/userSlice';
 
 const Login = () => {
   const [loading, setLoading] = useState(false);
+  const [errorMessage, setErrorMessage] = useState('');
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const onFinish = async (values) => {
     setLoading(true);
+    setErrorMessage(''); // Clear previous errors
+    
     try {
       const userCredential = await signInWithEmailAndPassword(
         auth,
@@ -28,7 +31,25 @@ const Login = () => {
       message.success('Login successful!');
       navigate('/interview');
     } catch (error) {
-      message.error(error.message);
+      // Handle Firebase-specific errors
+      let errorMsg = 'Login failed. Please try again.';
+      
+      if (error.code === 'auth/invalid-credential' || error.code === 'auth/wrong-password') {
+        errorMsg = 'Invalid email or password. Please check your credentials.';
+      } else if (error.code === 'auth/user-not-found') {
+        errorMsg = 'No account found with this email. Please sign up first.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMsg = 'Invalid email address format.';
+      } else if (error.code === 'auth/user-disabled') {
+        errorMsg = 'This account has been disabled. Please contact support.';
+      } else if (error.code === 'auth/too-many-requests') {
+        errorMsg = 'Too many failed attempts. Please try again later.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMsg = 'Network error. Please check your internet connection.';
+      }
+      
+      setErrorMessage(errorMsg);
+      message.error(errorMsg);
     } finally {
       setLoading(false);
     }
@@ -46,6 +67,16 @@ const Login = () => {
         title="Login to AI Interview Assistant"
         style={{ width: 400, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
       >
+        {errorMessage && (
+          <Alert
+            message={errorMessage}
+            type="error"
+            closable
+            onClose={() => setErrorMessage('')}
+            style={{ marginBottom: 16 }}
+          />
+        )}
+        
         <Form
           name="login"
           onFinish={onFinish}
@@ -66,7 +97,10 @@ const Login = () => {
           <Form.Item
             label="Password"
             name="password"
-            rules={[{ required: true, message: 'Please input your password!' }]}
+            rules={[
+              { required: true, message: 'Please input your password!' },
+              { min: 6, message: 'Password must be at least 6 characters!' }
+            ]}
           >
             <Input.Password size="large" placeholder="Enter your password" />
           </Form.Item>

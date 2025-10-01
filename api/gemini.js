@@ -72,10 +72,44 @@ export default async function handler(req, res) {
 
 function generatePrompt(action, params) {
   if (action === 'generateQuestion') {
-    return `You are an expert technical interviewer for a ${params.role} position. 
-Generate a ${params.difficulty} difficulty technical interview question (question ${params.questionNumber}/6).
-The question should test knowledge of React, Node.js, JavaScript, and full-stack development.
-Provide only the question text, no additional commentary.`;
+    const randomSeed = params.randomSeed || `${Date.now()}-${Math.random()}`;
+    let prompt = `You are an expert interviewer for a ${params.role} position.
+
+CRITICAL INSTRUCTIONS:
+- This is question ${params.questionNumber} of 6
+- Difficulty: ${params.difficulty}
+- Generate a COMPLETELY UNIQUE question (ID: ${randomSeed})
+- Make it specific to ${params.role}
+- DO NOT use generic interview questions
+
+`;
+
+    if (params.resumeContext && params.resumeContext.length > 50) {
+      prompt += `CANDIDATE'S BACKGROUND:
+${params.resumeContext}
+
+TASK: Create a question that relates to their specific experience and the ${params.role} role.
+
+`;
+    }
+
+    prompt += `Generate a ${params.difficulty} question for ${params.role} that:
+
+FOR TECHNICAL ROLES:
+- Tests practical skills in ${params.role}
+- Relates to real-world problems
+- Is scenario-based, not just definitions
+
+FOR NON-TECHNICAL ROLES:
+- Tests strategic thinking
+- Asks about situational scenarios
+- Evaluates domain knowledge
+
+MUST BE: Unique, specific to ${params.role}, conversational, and different from typical questions.
+
+Provide ONLY the question text.`;
+
+    return prompt;
   }
 
   if (action === 'evaluateAnswer') {

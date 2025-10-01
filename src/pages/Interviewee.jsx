@@ -3,7 +3,7 @@ import { useDispatch, useSelector } from 'react-redux';
 import { useNavigate } from 'react-router-dom';
 import {
   Layout, Card, Upload, Button, Input, message, Progress,
-  Typography, Space, Tag, Modal, Form
+  Typography, Space, Tag, Modal, Form, Select
 } from 'antd';
 import {
   UploadOutlined, SendOutlined, ClockCircleOutlined,
@@ -13,7 +13,7 @@ import { signOut } from 'firebase/auth';
 import { collection, addDoc } from 'firebase/firestore';
 import { auth, db } from '../firebase/config';
 import {
-  setCandidateInfo, setResumeUploaded, startInterview,
+  setCandidateInfo, setResumeUploaded, setJobRole, startInterview,
   setTimeRemaining, submitAnswer, nextQuestion,
   completeInterview, resetInterview, setHasUnfinishedSession
 } from '../redux/interviewSlice';
@@ -27,6 +27,7 @@ import WelcomeBackModal from '../components/WelcomeBackModal';
 const { Header, Content } = Layout;
 const { Title, Text, Paragraph } = Typography;
 const { TextArea } = Input;
+const { Option } = Select;
 
 const Interviewee = () => {
   const dispatch = useDispatch();
@@ -111,19 +112,31 @@ const Interviewee = () => {
       return;
     }
 
+    if (!interview.jobRole) {
+      message.warning('Please select the job role you are interviewing for!');
+      return;
+    }
+
     setLoading(true);
     try {
       const questions = [];
+      const resumeContext = interview.resumeText || '';
+      const jobRole = interview.jobRole;
       
-      // Generate 2 Easy, 2 Medium, 2 Hard questions
+      // Generate 2 Easy, 2 Medium, 2 Hard questions with resume context and job role
+      addMessage('bot', `Analyzing your resume for ${jobRole} position and generating personalized questions...`);
+      
       for (let i = 0; i < 2; i++) {
-        questions.push(await generateAIQuestion('easy', i + 1));
+        const question = await generateAIQuestion('easy', i + 1, resumeContext, jobRole);
+        questions.push(question);
       }
       for (let i = 0; i < 2; i++) {
-        questions.push(await generateAIQuestion('medium', i + 3));
+        const question = await generateAIQuestion('medium', i + 3, resumeContext, jobRole);
+        questions.push(question);
       }
       for (let i = 0; i < 2; i++) {
-        questions.push(await generateAIQuestion('hard', i + 5));
+        const question = await generateAIQuestion('hard', i + 5, resumeContext, jobRole);
+        questions.push(question);
       }
 
       const sessionId = `session_${Date.now()}`;
@@ -133,7 +146,7 @@ const Interviewee = () => {
         initialTime: questions[0].timeLimit
       }));
 
-      addMessage('bot', `Let's begin! Question 1 of 6 (${questions[0].difficulty.toUpperCase()}):`);
+      addMessage('bot', `Let's begin your ${jobRole} interview! Question 1 of 6 (${questions[0].difficulty.toUpperCase()}):`);
       addMessage('bot', questions[0].text);
     } catch (error) {
       message.error('Failed to start interview');
@@ -348,20 +361,48 @@ const Interviewee = () => {
             )}
 
             {interview.resumeUploaded && !interview.isInterviewActive && !interview.interviewCompleted && (
-              <Card type="inner" title="Step 2: Start Interview">
+              <Card type="inner" title="Step 2: Select Job Role & Start Interview">
                 <Paragraph>
                   <Text strong>Candidate:</Text> {interview.candidateName}<br />
                   <Text strong>Email:</Text> {interview.candidateEmail}<br />
                   <Text strong>Phone:</Text> {interview.candidatePhone}
                 </Paragraph>
+                
+                <Form.Item label="Select Job Role" style={{ marginBottom: 16 }}>
+                  <Select
+                    size="large"
+                    placeholder="Choose the position you're interviewing for"
+                    value={interview.jobRole}
+                    onChange={(value) => dispatch(setJobRole(value))}
+                    style={{ width: '100%' }}
+                  >
+                    <Option value="Full-Stack Developer">Full-Stack Developer</Option>
+                    <Option value="Frontend Developer">Frontend Developer (React/Vue/Angular)</Option>
+                    <Option value="Backend Developer">Backend Developer (Node.js/Python/Java)</Option>
+                    <Option value="Machine Learning Engineer">Machine Learning Engineer</Option>
+                    <Option value="Data Scientist">Data Scientist</Option>
+                    <Option value="DevOps Engineer">DevOps Engineer</Option>
+                    <Option value="Mobile Developer">Mobile Developer (iOS/Android)</Option>
+                    <Option value="Product Manager">Product Manager</Option>
+                    <Option value="UI/UX Designer">UI/UX Designer</Option>
+                    <Option value="Data Analyst">Data Analyst</Option>
+                    <Option value="Cloud Engineer">Cloud Engineer (AWS/Azure/GCP)</Option>
+                    <Option value="Cybersecurity Engineer">Cybersecurity Engineer</Option>
+                    <Option value="QA Engineer">QA/Test Engineer</Option>
+                    <Option value="Business Analyst">Business Analyst</Option>
+                    <Option value="Software Engineer">Software Engineer (General)</Option>
+                  </Select>
+                </Form.Item>
+                
                 <Button
                   type="primary"
                   size="large"
                   onClick={startInterviewSession}
                   loading={loading}
                   block
+                  disabled={!interview.jobRole}
                 >
-                  Start Interview (6 Questions)
+                  Start {interview.jobRole || 'Interview'} (6 Questions)
                 </Button>
               </Card>
             )}

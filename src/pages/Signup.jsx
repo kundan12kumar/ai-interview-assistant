@@ -8,15 +8,11 @@ import { setUser } from '../redux/userSlice';
 
 const Signup = () => {
   const [loading, setLoading] = useState(false);
+  const [form] = Form.useForm();
   const navigate = useNavigate();
   const dispatch = useDispatch();
 
   const onFinish = async (values) => {
-    if (values.password !== values.confirmPassword) {
-      message.error('Passwords do not match!');
-      return;
-    }
-
     setLoading(true);
     try {
       const userCredential = await createUserWithEmailAndPassword(
@@ -33,7 +29,19 @@ const Signup = () => {
       message.success('Account created successfully!');
       navigate('/interview');
     } catch (error) {
-      message.error(error.message);
+      let errorMessage = 'Failed to create account';
+      
+      if (error.code === 'auth/email-already-in-use') {
+        errorMessage = 'This email is already registered. Please login instead.';
+      } else if (error.code === 'auth/weak-password') {
+        errorMessage = 'Password is too weak. Please use at least 6 characters.';
+      } else if (error.code === 'auth/invalid-email') {
+        errorMessage = 'Invalid email address.';
+      } else if (error.code === 'auth/network-request-failed') {
+        errorMessage = 'Network error. Please check your connection.';
+      }
+      
+      message.error(errorMessage);
     } finally {
       setLoading(false);
     }
@@ -52,6 +60,7 @@ const Signup = () => {
         style={{ width: 400, boxShadow: '0 4px 12px rgba(0,0,0,0.15)' }}
       >
         <Form
+          form={form}
           name="signup"
           onFinish={onFinish}
           layout="vertical"
@@ -75,6 +84,7 @@ const Signup = () => {
               { required: true, message: 'Please input your password!' },
               { min: 6, message: 'Password must be at least 6 characters!' }
             ]}
+            hasFeedback
           >
             <Input.Password size="large" placeholder="Enter your password" />
           </Form.Item>
@@ -82,7 +92,19 @@ const Signup = () => {
           <Form.Item
             label="Confirm Password"
             name="confirmPassword"
-            rules={[{ required: true, message: 'Please confirm your password!' }]}
+            dependencies={['password']}
+            hasFeedback
+            rules={[
+              { required: true, message: 'Please confirm your password!' },
+              ({ getFieldValue }) => ({
+                validator(_, value) {
+                  if (!value || getFieldValue('password') === value) {
+                    return Promise.resolve();
+                  }
+                  return Promise.reject(new Error('The passwords do not match!'));
+                },
+              }),
+            ]}
           >
             <Input.Password size="large" placeholder="Confirm your password" />
           </Form.Item>

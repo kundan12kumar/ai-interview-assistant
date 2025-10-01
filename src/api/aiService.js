@@ -23,7 +23,8 @@ export const parseResume = async (file) => {
       return {
         name: lines[0] || '',
         email: emailMatch ? emailMatch[0] : '',
-        phone: phoneMatch ? phoneMatch[0].trim() : ''
+        phone: phoneMatch ? phoneMatch[0].trim() : '',
+        fullText: text // Return full resume text for context
       };
     }
     
@@ -31,11 +32,12 @@ export const parseResume = async (file) => {
     return {
       name: '',
       email: '',
-      phone: ''
+      phone: '',
+      fullText: ''
     };
   } catch (error) {
     console.error('Error parsing resume:', error);
-    return { name: '', email: '', phone: '' };
+    return { name: '', email: '', phone: '', fullText: '' };
   }
 };
 
@@ -70,14 +72,59 @@ const callGeminiAPIServerless = async (action, params) => {
 };
 
 // Generate AI questions using Gemini API
-export const generateAIQuestion = async (difficulty, questionNumber) => {
+export const generateAIQuestion = async (difficulty, questionNumber, resumeContext = '', jobRole = 'Full-Stack Developer') => {
   try {
     if (isDevelopment) {
-      // Development: Direct API call
-      const prompt = `You are an expert technical interviewer for a Full-Stack Developer (React/Node.js) position. 
-Generate a ${difficulty} difficulty technical interview question (question ${questionNumber}/6).
-The question should test knowledge of React, Node.js, JavaScript, and full-stack development.
-Provide only the question text, no additional commentary.`;
+      // Development: Direct API call with resume context
+      const randomSeed = `${Date.now()}-${Math.random()}-${questionNumber}-${difficulty}`;
+      
+      let prompt = `You are an expert technical interviewer for a ${jobRole} position.
+
+IMPORTANT INSTRUCTIONS:
+- This is question ${questionNumber} of 6
+- Difficulty level: ${difficulty}
+- Generate a COMPLETELY UNIQUE question (Random ID: ${randomSeed})
+- DO NOT repeat common interview questions
+- Make questions specific to the job role: ${jobRole}
+
+`;
+
+      // Add resume context if available
+      if (resumeContext && resumeContext.length > 50) {
+        const resumeSummary = resumeContext.substring(0, 1200);
+        prompt += `CANDIDATE'S RESUME/BACKGROUND:
+${resumeSummary}
+
+TASK: Analyze the candidate's:
+1. Skills and technologies mentioned
+2. Projects and experience
+3. Education and background
+4. Relate the question to their specific experience
+
+`;
+      }
+
+      prompt += `Generate a ${difficulty} difficulty question for ${jobRole} role that:
+
+FOR TECHNICAL ROLES (Software, ML, Data Science, etc.):
+- Tests practical problem-solving for ${jobRole}
+- Relates to technologies/projects in their resume (if provided)
+- Asks about real-world scenarios they might face
+- Avoids generic "what is X?" questions
+
+FOR NON-TECHNICAL ROLES (Product, Marketing, Business, etc.):
+- Tests strategic thinking and domain knowledge
+- Relates to their previous experience
+- Asks about situational scenarios
+- Tests analytical and communication skills
+
+REQUIREMENTS:
+- Be specific to ${jobRole} field
+- Make it conversational and scenario-based
+- Test understanding, not memorization
+- Generate something DIFFERENT from typical interview questions
+
+Provide ONLY the question text, nothing else.`;
 
       const questionText = await callGeminiAPIDirect(prompt);
       
@@ -93,32 +140,40 @@ Provide only the question text, no additional commentary.`;
       const response = await callGeminiAPIServerless('generateQuestion', {
         difficulty,
         questionNumber,
-        role: 'Full-Stack Developer (React/Node.js)'
+        role: jobRole,
+        resumeContext: resumeContext ? resumeContext.substring(0, 1200) : '',
+        randomSeed: `${Date.now()}-${Math.random()}`
       });
       
       return response.question;
     }
   } catch (error) {
     console.error('Error generating question:', error);
-    // Fallback questions
+    // Enhanced fallback questions for different roles
     const fallbackQuestions = {
       easy: [
-        { text: 'What is the difference between let, const, and var in JavaScript?', timeLimit: 20, difficulty: 'easy' },
-        { text: 'Explain the concept of props in React.', timeLimit: 20, difficulty: 'easy' }
+        { text: `What are the key responsibilities in a ${jobRole} role? How would you prioritize them?`, timeLimit: 20, difficulty: 'easy' },
+        { text: `Describe your understanding of the ${jobRole} field and current industry trends.`, timeLimit: 20, difficulty: 'easy' },
+        { text: `What tools and technologies are essential for a ${jobRole}? Why?`, timeLimit: 20, difficulty: 'easy' },
+        { text: `How do you stay updated with developments in ${jobRole}?`, timeLimit: 20, difficulty: 'easy' }
       ],
       medium: [
-        { text: 'How does the event loop work in Node.js?', timeLimit: 60, difficulty: 'medium' },
-        { text: 'Explain React hooks and when to use useState vs useEffect.', timeLimit: 60, difficulty: 'medium' }
+        { text: `Describe a challenging project related to ${jobRole}. How did you approach it?`, timeLimit: 60, difficulty: 'medium' },
+        { text: `How would you handle conflicting priorities in a ${jobRole} position?`, timeLimit: 60, difficulty: 'medium' },
+        { text: `Explain your problem-solving process when facing a ${jobRole} challenge.`, timeLimit: 60, difficulty: 'medium' },
+        { text: `What metrics would you use to measure success in a ${jobRole} role?`, timeLimit: 60, difficulty: 'medium' }
       ],
       hard: [
-        { text: 'Design a scalable REST API architecture for a social media platform. Discuss authentication, rate limiting, and database design.', timeLimit: 120, difficulty: 'hard' },
-        { text: 'Explain how you would optimize a React application that has performance issues. Discuss code splitting, memoization, and bundle optimization.', timeLimit: 120, difficulty: 'hard' }
+        { text: `Design a comprehensive strategy for ${jobRole} in a startup environment. Consider scalability, resources, and constraints.`, timeLimit: 120, difficulty: 'hard' },
+        { text: `You're leading a ${jobRole} initiative that's failing. Walk me through your recovery strategy.`, timeLimit: 120, difficulty: 'hard' },
+        { text: `How would you build and scale a ${jobRole} function from scratch in a growing company?`, timeLimit: 120, difficulty: 'hard' },
+        { text: `Critique current industry practices in ${jobRole}. What would you change and why?`, timeLimit: 120, difficulty: 'hard' }
       ]
     };
     
     const questions = fallbackQuestions[difficulty];
-    const index = (questionNumber % questions.length);
-    return questions[index];
+    const randomIndex = Math.floor(Math.random() * questions.length);
+    return questions[randomIndex];
   }
 };
 
