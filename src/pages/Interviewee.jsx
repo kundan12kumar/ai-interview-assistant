@@ -187,7 +187,11 @@ const Interviewee = () => {
       const currentQ = interview.questions[interview.currentQuestionIndex];
       const score = await evaluateAIAnswer(currentQ.text, answer);
       
+      // Save the answer first
       dispatch(submitAnswer({ answer, score }));
+      
+      // Wait a bit for state to update
+      await new Promise(resolve => setTimeout(resolve, 100));
       
       if (interview.currentQuestionIndex < interview.questions.length - 1) {
         dispatch(nextQuestion());
@@ -196,7 +200,8 @@ const Interviewee = () => {
         addMessage('bot', `Question ${interview.currentQuestionIndex + 2} of 6 (${nextQ.difficulty.toUpperCase()}):`);
         addMessage('bot', nextQ.text);
       } else {
-        await finishInterview();
+        // This is the last question, finish interview with updated state
+        await finishInterview(answer, score);
       }
     } catch (error) {
       message.error('Failed to process answer');
@@ -205,23 +210,31 @@ const Interviewee = () => {
     }
   };
 
-  const finishInterview = async () => {
+  const finishInterview = async (lastAnswer = null, lastScore = null) => {
     setLoading(true);
     
     try {
+      // Get the complete answers and scores including the last one
+      const allAnswers = lastAnswer 
+        ? [...interview.answers, lastAnswer] 
+        : interview.answers;
+      const allScores = lastScore !== null 
+        ? [...interview.scores, lastScore] 
+        : interview.scores;
+      
       const transcript = {
         qa: interview.questions.map((q, i) => ({
           question: q.text,
-          answer: interview.answers[i]
+          answer: allAnswers[i] || 'No answer provided'
         })),
-        scores: interview.scores
+        scores: allScores
       };
 
       const result = await summarizeAIInterview(transcript);
       
       dispatch(completeInterview(result));
       
-      // Save to Firestore
+      // Save to Firestore with complete data
       await addDoc(collection(db, 'interviews'), {
         userId: user.uid,
         candidateName: interview.candidateName,
@@ -230,8 +243,8 @@ const Interviewee = () => {
         companyName: interview.companyName || '',
         jobRole: interview.jobRole,
         questions: interview.questions,
-        answers: interview.answers,
-        scores: interview.scores,
+        answers: allAnswers, // Use complete answers array
+        scores: allScores, // Use complete scores array
         finalScore: result.finalScore,
         summary: result.summary,
         completedAt: new Date()
@@ -242,6 +255,7 @@ const Interviewee = () => {
       
       message.success('Interview completed and saved successfully!');
     } catch (error) {
+      console.error('Error finishing interview:', error);
       message.error('Failed to complete interview');
     } finally {
       setLoading(false);
@@ -263,27 +277,40 @@ const Interviewee = () => {
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{
         background: '#fff',
-        padding: '0 24px',
+        padding: '0 16px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
         display: 'flex',
+        flexWrap: 'wrap',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        gap: '12px',
+        minHeight: '64px'
       }}>
-        <Title level={3} style={{ margin: 0 }}>
+        <Title level={3} style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 20px)' }}>
           AI Interview Assistant - Interviewee
         </Title>
-        <Space>
-          <Text><UserOutlined /> {user?.email}</Text>
-          <Button icon={<LogoutOutlined />} onClick={handleLogout}>
-            Logout
+        <Space wrap size="small">
+          <Text style={{ fontSize: 'clamp(12px, 3vw, 14px)' }}>
+            <UserOutlined /> {user?.email}
+          </Text>
+          <Button 
+            icon={<LogoutOutlined />} 
+            onClick={handleLogout}
+            size="small"
+          >
+            <span style={{ display: window.innerWidth > 480 ? 'inline' : 'none' }}>Logout</span>
           </Button>
-          <Button onClick={() => navigate('/dashboard')}>
-            View Dashboard
+          <Button 
+            onClick={() => navigate('/dashboard')}
+            size="small"
+          >
+            <span style={{ display: window.innerWidth > 480 ? 'inline' : 'none' }}>Dashboard</span>
+            <span style={{ display: window.innerWidth <= 480 ? 'inline' : 'none' }}>📊</span>
           </Button>
         </Space>
       </Header>
 
-      <Content style={{ padding: '24px', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
+      <Content style={{ padding: 'clamp(12px, 3vw, 24px)', maxWidth: '900px', margin: '0 auto', width: '100%' }}>
         <WelcomeBackModal
           visible={interview.hasUnfinishedSession}
           onResume={handleResumeSession}

@@ -173,27 +173,40 @@ const Dashboard = () => {
     <Layout style={{ minHeight: '100vh' }}>
       <Header style={{
         background: '#fff',
-        padding: '0 24px',
+        padding: '0 16px',
         boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
         display: 'flex',
+        flexWrap: 'wrap',
         justifyContent: 'space-between',
-        alignItems: 'center'
+        alignItems: 'center',
+        gap: '12px',
+        minHeight: '64px'
       }}>
-        <Title level={3} style={{ margin: 0 }}>
+        <Title level={3} style={{ margin: 0, fontSize: 'clamp(16px, 4vw, 20px)' }}>
           AI Interview Assistant - Dashboard
         </Title>
-        <Space>
-          <Text><UserOutlined /> {user?.email}</Text>
-          <Button onClick={() => navigate('/interview')}>
-            Take Interview
+        <Space wrap size="small">
+          <Text style={{ fontSize: 'clamp(12px, 3vw, 14px)' }}>
+            <UserOutlined /> {user?.email}
+          </Text>
+          <Button 
+            onClick={() => navigate('/interview')}
+            size="small"
+          >
+            <span style={{ display: window.innerWidth > 480 ? 'inline' : 'none' }}>Take Interview</span>
+            <span style={{ display: window.innerWidth <= 480 ? 'inline' : 'none' }}>📝</span>
           </Button>
-          <Button icon={<LogoutOutlined />} onClick={handleLogout}>
-            Logout
+          <Button 
+            icon={<LogoutOutlined />} 
+            onClick={handleLogout}
+            size="small"
+          >
+            <span style={{ display: window.innerWidth > 480 ? 'inline' : 'none' }}>Logout</span>
           </Button>
         </Space>
       </Header>
 
-      <Content style={{ padding: '24px' }}>
+      <Content style={{ padding: 'clamp(12px, 3vw, 24px)' }}>
         <Row gutter={16} style={{ marginBottom: 24 }}>
           <Col span={8}>
             <Card>
