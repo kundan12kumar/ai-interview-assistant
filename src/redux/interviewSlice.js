@@ -5,6 +5,7 @@ const initialState = {
   candidateName: '',
   candidateEmail: '',
   candidatePhone: '',
+  companyName: '', // Company they're interviewing for
   resumeUploaded: false,
   resumeText: '', // Store full resume text for context
   jobRole: 'Full-Stack Developer', // Job role for interview

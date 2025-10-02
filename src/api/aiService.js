@@ -72,22 +72,34 @@ const callGeminiAPIServerless = async (action, params) => {
 };
 
 // Generate AI questions using Gemini API
-export const generateAIQuestion = async (difficulty, questionNumber, resumeContext = '', jobRole = 'Full-Stack Developer') => {
+export const generateAIQuestion = async (difficulty, questionNumber, resumeContext = '', jobRole = 'Full-Stack Developer', companyName = '') => {
   try {
     if (isDevelopment) {
       // Development: Direct API call with resume context
       const randomSeed = `${Date.now()}-${Math.random()}-${questionNumber}-${difficulty}`;
       
-      let prompt = `You are an expert technical interviewer for a ${jobRole} position.
+      let prompt = `You are an expert technical interviewer for a ${jobRole} position${companyName ? ` at ${companyName}` : ''}.
 
-IMPORTANT INSTRUCTIONS:
+CRITICAL INSTRUCTIONS:
 - This is question ${questionNumber} of 6
 - Difficulty level: ${difficulty}
-- Generate a COMPLETELY UNIQUE question (Random ID: ${randomSeed})
-- DO NOT repeat common interview questions
-- Make questions specific to the job role: ${jobRole}
+- Generate a COMPLETELY UNIQUE technical question (Random ID: ${randomSeed})
+- DO NOT ask basic definition questions
+- Make questions HIGHLY TECHNICAL and hands-on
 
 `;
+
+      // Add company context if available
+      if (companyName) {
+        prompt += `COMPANY CONTEXT: ${companyName}
+Research and incorporate ${companyName}'s:
+- Technology stack and products
+- Engineering challenges
+- Industry domain
+- Scale and infrastructure needs
+
+`;
+      }
 
       // Add resume context if available
       if (resumeContext && resumeContext.length > 50) {
@@ -95,36 +107,86 @@ IMPORTANT INSTRUCTIONS:
         prompt += `CANDIDATE'S RESUME/BACKGROUND:
 ${resumeSummary}
 
-TASK: Analyze the candidate's:
-1. Skills and technologies mentioned
-2. Projects and experience
-3. Education and background
-4. Relate the question to their specific experience
+TASK: Analyze their skills, technologies, and projects.
 
 `;
       }
 
-      prompt += `Generate a ${difficulty} difficulty question for ${jobRole} role that:
+      prompt += `Generate a ${difficulty} difficulty TECHNICAL question for ${jobRole}:
 
-FOR TECHNICAL ROLES (Software, ML, Data Science, etc.):
-- Tests practical problem-solving for ${jobRole}
-- Relates to technologies/projects in their resume (if provided)
-- Asks about real-world scenarios they might face
-- Avoids generic "what is X?" questions
+FOR SOFTWARE/TECHNICAL ROLES - MANDATORY REQUIREMENTS:
+${difficulty === 'easy' ? `
+EASY questions MUST:
+- Ask to write/implement actual code or pseudocode
+- Focus on hands-on debugging scenarios
+- Test implementation knowledge, not definitions
+- Example formats:
+  * "Implement a function that..."
+  * "Debug this code..."
+  * "Write a solution for..."
+  * "How would you code..."
 
-FOR NON-TECHNICAL ROLES (Product, Marketing, Business, etc.):
-- Tests strategic thinking and domain knowledge
-- Relates to their previous experience
-- Asks about situational scenarios
-- Tests analytical and communication skills
+FORBIDDEN for EASY:
+- "What is...?" questions
+- "Explain the difference..." questions  
+- Pure theory questions
+` : ''}
 
-REQUIREMENTS:
-- Be specific to ${jobRole} field
-- Make it conversational and scenario-based
-- Test understanding, not memorization
-- Generate something DIFFERENT from typical interview questions
+${difficulty === 'medium' ? `
+MEDIUM questions MUST:
+- Require system/architecture design at component level
+- Test optimization and trade-off analysis
+- Involve real-world constraints (scale, performance, cost)
+- Example formats:
+  * "Design a system for..."
+  * "Optimize this scenario..."
+  * "Compare approaches for... (with specific scenarios)"
+  * "Implement X considering Y constraints..."
 
-Provide ONLY the question text, nothing else.`;
+FORBIDDEN for MEDIUM:
+- Generic "how does X work?" questions
+- Questions without specific scenarios
+- Pure conceptual questions
+` : ''}
+
+${difficulty === 'hard' ? `
+HARD questions MUST:
+- Require large-scale distributed system design
+- Test deep technical decision-making
+- Include numbers: QPS, latency, data volume
+- Require discussing CAP theorem, consistency, availability
+- Example formats:
+  * "Design a system handling X requests/second..."
+  * "Architect a distributed Y with Z constraints..."
+  * "Build a scalable solution for... (with specific metrics)"
+  * "Design for 1M+ users/10GB+ data/etc..."
+
+FORBIDDEN for HARD:
+- Questions without scale metrics
+- Generic architecture questions
+- Questions that don't require distributed thinking
+` : ''}
+
+FOR DATA/ML ROLES:
+- Ask about implementing algorithms from scratch
+- Require discussing specific models and math
+- Test practical ML pipeline design with metrics
+- Include data preprocessing and feature engineering
+
+FOR DEVOPS/CLOUD ROLES:
+- Ask about infrastructure as code implementation
+- Test CI/CD pipeline design with specific tools
+- Require discussing monitoring, costs, security
+- Include disaster recovery and scaling
+
+CRITICAL RULES:
+1. NEVER ask "What is...?" or "Explain..." questions
+2. ALWAYS make it hands-on: "Implement", "Design", "Build", "Debug"
+3. ALWAYS include specific scenarios or constraints
+4. BE EXTREMELY TECHNICAL - test actual job skills
+${companyName ? `5. Reference ${companyName}'s scale/challenges when relevant` : ''}
+
+Provide ONLY the highly technical question, nothing else.`;
 
       const questionText = await callGeminiAPIDirect(prompt);
       
@@ -142,6 +204,7 @@ Provide ONLY the question text, nothing else.`;
         questionNumber,
         role: jobRole,
         resumeContext: resumeContext ? resumeContext.substring(0, 1200) : '',
+        companyName: companyName || '',
         randomSeed: `${Date.now()}-${Math.random()}`
       });
       
@@ -149,31 +212,99 @@ Provide ONLY the question text, nothing else.`;
     }
   } catch (error) {
     console.error('Error generating question:', error);
-    // Enhanced fallback questions for different roles
-    const fallbackQuestions = {
-      easy: [
-        { text: `What are the key responsibilities in a ${jobRole} role? How would you prioritize them?`, timeLimit: 20, difficulty: 'easy' },
-        { text: `Describe your understanding of the ${jobRole} field and current industry trends.`, timeLimit: 20, difficulty: 'easy' },
-        { text: `What tools and technologies are essential for a ${jobRole}? Why?`, timeLimit: 20, difficulty: 'easy' },
-        { text: `How do you stay updated with developments in ${jobRole}?`, timeLimit: 20, difficulty: 'easy' }
-      ],
-      medium: [
-        { text: `Describe a challenging project related to ${jobRole}. How did you approach it?`, timeLimit: 60, difficulty: 'medium' },
-        { text: `How would you handle conflicting priorities in a ${jobRole} position?`, timeLimit: 60, difficulty: 'medium' },
-        { text: `Explain your problem-solving process when facing a ${jobRole} challenge.`, timeLimit: 60, difficulty: 'medium' },
-        { text: `What metrics would you use to measure success in a ${jobRole} role?`, timeLimit: 60, difficulty: 'medium' }
-      ],
-      hard: [
-        { text: `Design a comprehensive strategy for ${jobRole} in a startup environment. Consider scalability, resources, and constraints.`, timeLimit: 120, difficulty: 'hard' },
-        { text: `You're leading a ${jobRole} initiative that's failing. Walk me through your recovery strategy.`, timeLimit: 120, difficulty: 'hard' },
-        { text: `How would you build and scale a ${jobRole} function from scratch in a growing company?`, timeLimit: 120, difficulty: 'hard' },
-        { text: `Critique current industry practices in ${jobRole}. What would you change and why?`, timeLimit: 120, difficulty: 'hard' }
-      ]
+    // Enhanced technical fallback questions
+    const technicalFallbacks = {
+      'Full-Stack Developer': {
+        easy: [
+          { text: 'Write a JavaScript function to implement deep cloning of an object without using JSON.parse/stringify. Handle circular references.', timeLimit: 20 },
+          { text: 'Implement a React custom hook for debouncing user input. Explain when the debounced value updates.', timeLimit: 20 },
+          { text: 'Debug this: A React component updates infinitely. useEffect(() => { setState(data) }, [data]). Fix it and explain why.', timeLimit: 20 },
+          { text: 'Write code to implement Promise.all() from scratch using Promise constructor. Handle rejections properly.', timeLimit: 20 }
+        ],
+        medium: [
+          { text: 'Design a rate limiting middleware for Express.js handling 1000 req/sec per user. Discuss Redis vs in-memory approaches.', timeLimit: 60 },
+          { text: 'Implement an LRU cache in JavaScript with O(1) get/put operations. Explain the data structures used.', timeLimit: 60 },
+          { text: 'Design a WebSocket connection manager that handles 10K concurrent connections. Discuss reconnection, heartbeat, and load balancing.', timeLimit: 60 },
+          { text: 'Optimize a React app rendering a 10K row table. Discuss virtualization, windowing, and memo strategies with code examples.', timeLimit: 60 }
+        ],
+        hard: [
+          { text: 'Design a URL shortener handling 100M URLs and 10M requests/day. Discuss hashing, database sharding, cache strategy, and collision handling.', timeLimit: 120 },
+          { text: 'Architect a real-time collaborative document editor (like Google Docs). Discuss CRDT/OT algorithms, conflict resolution, and WebSocket architecture.', timeLimit: 120 },
+          { text: 'Design a distributed session store for 1M active users across 100 servers. Discuss consistency, failover, and session replication strategies.', timeLimit: 120 },
+          { text: 'Build a CDN architecture for serving static assets globally with <100ms latency. Discuss edge caching, origin servers, and cache invalidation.', timeLimit: 120 }
+        ]
+      },
+      'Machine Learning Engineer': {
+        easy: [
+          { text: 'Implement gradient descent for linear regression from scratch in Python. Explain learning rate impact on convergence.', timeLimit: 20 },
+          { text: 'Write code to handle imbalanced datasets (1:100 ratio). Compare oversampling, undersampling, and SMOTE approaches.', timeLimit: 20 },
+          { text: 'Debug this: Model has 95% train accuracy but 60% val accuracy. Diagnose the problem and suggest 3 solutions with reasoning.', timeLimit: 20 }
+        ],
+        medium: [
+          { text: 'Design an ML pipeline for real-time fraud detection processing 1000 transactions/sec. Discuss feature engineering, model serving, and monitoring.', timeLimit: 60 },
+          { text: 'Implement custom loss function for multi-label classification with label imbalance. Explain why cross-entropy alone fails here.', timeLimit: 60 },
+          { text: 'Design an A/B test for a new ML model. Discuss sample size, statistical significance (alpha=0.05), and guardrail metrics.', timeLimit: 60 }
+        ],
+        hard: [
+          { text: 'Architect a recommendation system for 100M users with 10M items. Discuss collaborative filtering, matrix factorization, cold start, and real-time updates.', timeLimit: 120 },
+          { text: 'Design distributed training for a 10B parameter model across 100 GPUs. Discuss data parallelism, model parallelism, and gradient synchronization.', timeLimit: 120 },
+          { text: 'Build an ML monitoring system detecting model drift, data drift, and performance degradation. Discuss metrics, alerting thresholds, and retraining triggers.', timeLimit: 120 }
+        ]
+      },
+      'Data Scientist': {
+        easy: [
+          { text: 'Write SQL to find users who made purchases in consecutive months. Optimize for a 100M row table.', timeLimit: 20 },
+          { text: 'Implement statistical hypothesis testing in Python for A/B test with 10K users per variant. Calculate p-value and confidence interval.', timeLimit: 20 },
+          { text: 'Debug this analysis: Revenue increased 20% but profit decreased. What metrics would you investigate? Write SQL queries.', timeLimit: 20 }
+        ],
+        medium: [
+          { text: 'Design an A/B testing framework for 100 experiments/month. Discuss multiple testing correction (Bonferroni vs FDR), sample size calculation, and p-hacking prevention.', timeLimit: 60 },
+          { text: 'Analyze this: Conversion rate dropped 15% after a feature launch. Design an investigation plan with specific SQL queries and statistical tests.', timeLimit: 60 },
+          { text: 'Build a customer churn prediction model. Discuss feature engineering from behavioral data, handling class imbalance, and model evaluation metrics.', timeLimit: 60 }
+        ],
+        hard: [
+          { text: 'Design a causal inference study for measuring feature impact on 30-day retention. Discuss propensity score matching, difference-in-differences, and confounding variables.', timeLimit: 120 },
+          { text: 'Build a real-time dashboard processing 1B events/day. Discuss data architecture (batch vs streaming), aggregation strategies, and query optimization.', timeLimit: 120 },
+          { text: 'Design an experimentation platform for marketplace with network effects. Discuss cluster randomization, switchback tests, and interference mitigation.', timeLimit: 120 }
+        ]
+      },
+      'DevOps Engineer': {
+        easy: [
+          { text: 'Write a Dockerfile for a Node.js app with multi-stage build. Optimize for image size and build time.', timeLimit: 20 },
+          { text: 'Debug this: Pod crashes with OOMKilled error in Kubernetes. Diagnose using kubectl commands and fix with resource limits.', timeLimit: 20 },
+          { text: 'Implement a health check endpoint for a microservice. What HTTP codes and response times indicate healthy vs unhealthy?', timeLimit: 20 }
+        ],
+        medium: [
+          { text: 'Design a CI/CD pipeline for 50 microservices with 100 deploys/day. Discuss build optimization, testing strategy, and rollback mechanisms.', timeLimit: 60 },
+          { text: 'Implement auto-scaling for a web service handling 1K-10K RPS daily variation. Discuss metrics, scaling policies, and cost optimization.', timeLimit: 60 },
+          { text: 'Design a monitoring system for 100 microservices. Discuss metrics collection (Prometheus), log aggregation, and alerting rules with specific thresholds.', timeLimit: 60 }
+        ],
+        hard: [
+          { text: 'Architect a multi-region Kubernetes cluster with 99.99% uptime SLA. Discuss disaster recovery, data replication, and failover automation.', timeLimit: 120 },
+          { text: 'Design infrastructure for handling 10x traffic spikes (Black Friday). Discuss capacity planning, caching layers, and database scaling strategies.', timeLimit: 120 },
+          { text: 'Build a zero-downtime deployment system for a stateful application with database migrations. Discuss blue-green deployment, feature flags, and rollback strategies.', timeLimit: 120 }
+        ]
+      },
+      'default': {
+        easy: [
+          { text: `Implement a solution for a common ${jobRole} task. Write code or pseudocode and explain your approach.`, timeLimit: 20 },
+          { text: `Debug a production issue in ${jobRole}. Describe your diagnostic process with specific tools and commands.`, timeLimit: 20 }
+        ],
+        medium: [
+          { text: `Design a system component for ${jobRole} handling 10K operations/sec. Discuss architecture, scalability, and failure modes.`, timeLimit: 60 },
+          { text: `Optimize a slow-performing ${jobRole} process. Identify bottlenecks and propose specific improvements with metrics.`, timeLimit: 60 }
+        ],
+        hard: [
+          { text: `Architect a large-scale ${jobRole} system for 1M+ users. Discuss distributed architecture, data consistency, and monitoring.`, timeLimit: 120 },
+          { text: `Design disaster recovery for a critical ${jobRole} service with 99.99% uptime SLA. Discuss backup, replication, and failover strategies.`, timeLimit: 120 }
+        ]
+      }
     };
     
-    const questions = fallbackQuestions[difficulty];
+    const roleQuestions = technicalFallbacks[jobRole] || technicalFallbacks['default'];
+    const questions = roleQuestions[difficulty];
     const randomIndex = Math.floor(Math.random() * questions.length);
-    return questions[randomIndex];
+    return { ...questions[randomIndex], difficulty };
   }
 };
 

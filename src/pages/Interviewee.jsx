@@ -103,7 +103,7 @@ const Interviewee = () => {
     dispatch(setCandidateInfo(values));
     dispatch(setResumeUploaded(true));
     setInfoModalVisible(false);
-    addMessage('bot', `Thank you, ${values.name}! Ready to begin the interview?`);
+    addMessage('bot', `Thank you, ${values.name}! ${values.companyName ? `Good luck with your ${values.companyName} interview!` : 'Ready to begin the interview?'}`);
   };
 
   const startInterviewSession = async () => {
@@ -122,20 +122,21 @@ const Interviewee = () => {
       const questions = [];
       const resumeContext = interview.resumeText || '';
       const jobRole = interview.jobRole;
+      const companyName = interview.companyName || '';
       
-      // Generate 2 Easy, 2 Medium, 2 Hard questions with resume context and job role
-      addMessage('bot', `Analyzing your resume for ${jobRole} position and generating personalized questions...`);
+      // Generate 2 Easy, 2 Medium, 2 Hard questions with resume context, job role, and company
+      addMessage('bot', `Analyzing your resume for ${jobRole} position${companyName ? ` at ${companyName}` : ''} and generating technical questions...`);
       
       for (let i = 0; i < 2; i++) {
-        const question = await generateAIQuestion('easy', i + 1, resumeContext, jobRole);
+        const question = await generateAIQuestion('easy', i + 1, resumeContext, jobRole, companyName);
         questions.push(question);
       }
       for (let i = 0; i < 2; i++) {
-        const question = await generateAIQuestion('medium', i + 3, resumeContext, jobRole);
+        const question = await generateAIQuestion('medium', i + 3, resumeContext, jobRole, companyName);
         questions.push(question);
       }
       for (let i = 0; i < 2; i++) {
-        const question = await generateAIQuestion('hard', i + 5, resumeContext, jobRole);
+        const question = await generateAIQuestion('hard', i + 5, resumeContext, jobRole, companyName);
         questions.push(question);
       }
 
@@ -146,7 +147,7 @@ const Interviewee = () => {
         initialTime: questions[0].timeLimit
       }));
 
-      addMessage('bot', `Let's begin your ${jobRole} interview! Question 1 of 6 (${questions[0].difficulty.toUpperCase()}):`);
+      addMessage('bot', `Let's begin your ${jobRole} interview${companyName ? ` for ${companyName}` : ''}! Question 1 of 6 (${questions[0].difficulty.toUpperCase()}):`);
       addMessage('bot', questions[0].text);
     } catch (error) {
       message.error('Failed to start interview');
@@ -226,6 +227,8 @@ const Interviewee = () => {
         candidateName: interview.candidateName,
         candidateEmail: interview.candidateEmail,
         candidatePhone: interview.candidatePhone,
+        companyName: interview.companyName || '',
+        jobRole: interview.jobRole,
         questions: interview.questions,
         answers: interview.answers,
         scores: interview.scores,
@@ -296,7 +299,10 @@ const Interviewee = () => {
             <Form.Item
               label="Full Name"
               name="name"
-              rules={[{ required: true, message: 'Please enter your name!' }]}
+              rules={[
+                { required: true, message: 'Please enter your name!' },
+                { min: 2, message: 'Name must be at least 2 characters!' }
+              ]}
             >
               <Input placeholder="Enter your full name" />
             </Form.Item>
@@ -305,17 +311,35 @@ const Interviewee = () => {
               name="email"
               rules={[
                 { required: true, message: 'Please enter your email!' },
-                { type: 'email', message: 'Please enter a valid email!' }
+                { type: 'email', message: 'Please enter a valid email!' },
+                { 
+                  pattern: /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/,
+                  message: 'Email format is invalid!'
+                }
               ]}
             >
               <Input placeholder="Enter your email" />
             </Form.Item>
             <Form.Item
-              label="Phone"
+              label="Phone Number"
               name="phone"
-              rules={[{ required: true, message: 'Please enter your phone number!' }]}
+              rules={[
+                { required: true, message: 'Please enter your phone number!' },
+                {
+                  pattern: /^[+]?[(]?[0-9]{1,4}[)]?[-\s.]?[(]?[0-9]{1,4}[)]?[-\s.]?[0-9]{1,9}$/,
+                  message: 'Please enter a valid phone number!'
+                },
+                { min: 10, message: 'Phone number must be at least 10 digits!' }
+              ]}
             >
-              <Input placeholder="Enter your phone number" />
+              <Input placeholder="Enter your phone number (e.g., +1234567890)" />
+            </Form.Item>
+            <Form.Item
+              label="Company Name (Optional)"
+              name="companyName"
+              help="The company you're interviewing for - helps generate relevant questions"
+            >
+              <Input placeholder="e.g., Google, Amazon, Microsoft" />
             </Form.Item>
             <Form.Item>
               <Button type="primary" htmlType="submit" block>
@@ -365,7 +389,10 @@ const Interviewee = () => {
                 <Paragraph>
                   <Text strong>Candidate:</Text> {interview.candidateName}<br />
                   <Text strong>Email:</Text> {interview.candidateEmail}<br />
-                  <Text strong>Phone:</Text> {interview.candidatePhone}
+                  <Text strong>Phone:</Text> {interview.candidatePhone}<br />
+                  {interview.companyName && (
+                    <><Text strong>Company:</Text> {interview.companyName}<br /></>
+                  )}
                 </Paragraph>
                 
                 <Form.Item label="Select Job Role" style={{ marginBottom: 16 }}>

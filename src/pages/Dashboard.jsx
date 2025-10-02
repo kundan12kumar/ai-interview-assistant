@@ -294,14 +294,14 @@ const Dashboard = () => {
                         <Space direction="vertical" style={{ width: '100%' }}>
                           <div>
                             <Tag color={getDifficultyColor(question.difficulty)}>
-                              {question.difficulty.toUpperCase()}
+                              {question.difficulty?.toUpperCase() || 'N/A'}
                             </Tag>
-                            <Tag>Score: {selectedCandidate.scores[index]}/10</Tag>
+                            <Tag>Score: {selectedCandidate.scores?.[index] ?? 'N/A'}/10</Tag>
                           </div>
-                          <Text strong>Q{index + 1}: {question.text}</Text>
+                          <Text strong>Q{index + 1}: {question.text || question}</Text>
                           <Paragraph style={{ marginTop: 8, marginBottom: 0 }}>
                             <Text type="secondary">Answer:</Text><br />
-                            {selectedCandidate.answers[index] || 'No answer provided'}
+                            {selectedCandidate.answers?.[index] || 'No answer provided'}
                           </Paragraph>
                         </Space>
                       </Card>
